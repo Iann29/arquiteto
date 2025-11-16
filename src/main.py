@@ -6,12 +6,13 @@ GUI reconstruída do zero com DearPyGUI
 
 import dearpygui.dearpygui as dpg
 
+from constants import AVAILABLE_APPS
+
 # Importar módulos do Arquiteto
 from database import Database
 from project_manager import ProjectManager
-from workspace_manager import WorkspaceManager
 from ram_monitor import RAMMonitor
-from constants import AVAILABLE_APPS
+from workspace_manager import WorkspaceManager
 from zen_controller import ZenController
 
 
@@ -44,20 +45,30 @@ class Arquiteto:
 
         # Gerar ID único para o node
         import random
+
         node_id = f"node_projeto_iniciado_{random.randint(1000, 9999)}"
         input_id = f"project_started_input_{random.randint(1000, 9999)}"
 
         # Criar node no editor
-        with dpg.node(label="Projeto Iniciado", tag=node_id, parent="map_node_editor", pos=(100, 100)):
-            with dpg.node_attribute(label="projectStarted", attribute_type=dpg.mvNode_Attr_Static):
+        with dpg.node(
+            label="Projeto Iniciado",
+            tag=node_id,
+            parent="map_node_editor",
+            pos=(100, 100),
+        ):
+            with dpg.node_attribute(
+                label="projectStarted", attribute_type=dpg.mvNode_Attr_Static
+            ):
                 dpg.add_input_text(
                     label="Nome do Projeto",
                     tag=input_id,
                     hint="Ex: uberti, mecanica, amage...",
-                    width=200
+                    width=200,
                 )
 
-            with dpg.node_attribute(label="Output", attribute_type=dpg.mvNode_Attr_Output):
+            with dpg.node_attribute(
+                label="Output", attribute_type=dpg.mvNode_Attr_Output
+            ):
                 dpg.add_text("Projeto ->")
 
         print(f"Node 'Projeto Iniciado' adicionado: {node_id}")
@@ -70,39 +81,240 @@ class Arquiteto:
 
         # Gerar ID único para o node
         import random
+
         node_id = f"node_abrir_{random.randint(1000, 9999)}"
 
-        # Criar tema customizado para node "Abrir" (verde)
+        # Criar tema customizado para node "Abrir" (verde #4AA545)
         if not dpg.does_item_exist("theme_abrir"):
             with dpg.theme(tag="theme_abrir"):
                 with dpg.theme_component(dpg.mvNode):
-                    # Fundo do node (verde claro)
-                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackground, (100, 200, 100, 255), category=dpg.mvThemeCat_Nodes)
-                    # Fundo quando hover (verde mais claro)
-                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackgroundHovered, (120, 220, 120, 255), category=dpg.mvThemeCat_Nodes)
-                    # Fundo quando selecionado (verde brilhante)
-                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackgroundSelected, (150, 255, 150, 255), category=dpg.mvThemeCat_Nodes)
+                    # Fundo transparente para deixar a imagem dominar o node
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_NodeBackground,
+                        (0, 0, 0, 0),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_NodeBackgroundHovered,
+                        (0, 0, 0, 0),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_NodeBackgroundSelected,
+                        (0, 0, 0, 0),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_NodeOutline,
+                        (0, 0, 0, 0),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
                     # Barra de título (verde escuro)
-                    dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (50, 150, 50, 255), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_TitleBar,
+                        (54, 145, 49, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
                     # Barra de título hover
-                    dpg.add_theme_color(dpg.mvNodeCol_TitleBarHovered, (70, 170, 70, 255), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_TitleBarHovered,
+                        (64, 155, 59, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
                     # Barra de título selecionado
-                    dpg.add_theme_color(dpg.mvNodeCol_TitleBarSelected, (90, 190, 90, 255), category=dpg.mvThemeCat_Nodes)
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_TitleBarSelected,
+                        (84, 175, 79, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    # Padding mínimo e sem borda para manter dimensões compactas
+                    dpg.add_theme_style(
+                        dpg.mvNodeStyleVar_NodePadding,
+                        1,
+                        1,
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    dpg.add_theme_style(
+                        dpg.mvNodeStyleVar_NodeBorderThickness,
+                        0,
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    dpg.add_theme_style(
+                        dpg.mvNodeStyleVar_NodeCornerRounding,
+                        6,
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                with dpg.theme_component(dpg.mvAll):
+                    # Remove fundo dos elementos internos (FrameBg)
+                    dpg.add_theme_color(
+                        dpg.mvThemeCol_FrameBg,
+                        (0, 0, 0, 0),
+                        category=dpg.mvThemeCat_Core,
+                    )
+                    dpg.add_theme_color(
+                        dpg.mvThemeCol_FrameBgHovered,
+                        (0, 0, 0, 0),
+                        category=dpg.mvThemeCat_Core,
+                    )
+                    dpg.add_theme_color(
+                        dpg.mvThemeCol_FrameBgActive,
+                        (0, 0, 0, 0),
+                        category=dpg.mvThemeCat_Core,
+                    )
 
         # Criar node no editor
-        with dpg.node(label="  Abrir  ", tag=node_id, parent="map_node_editor", pos=(400, 100)):
+        with dpg.node(
+            label="  Abrir  ", tag=node_id, parent="map_node_editor", pos=(400, 100)
+        ):
             # Input - recebe contexto (projeto, path, etc)
-            with dpg.node_attribute(label="Input", attribute_type=dpg.mvNode_Attr_Input):
-                dpg.add_spacer(width=80, height=5)  # Spacer invisível pra dar tamanho
+            with dpg.node_attribute(
+                label="Input", attribute_type=dpg.mvNode_Attr_Input
+            ):
+                # Spacer vertical posiciona o pin na mesma altura da imagem
+                dpg.add_spacer(width=1, height=1)
 
-            # Output - passa contexto pra frente (sinaliza "vai abrir")
-            with dpg.node_attribute(label="Output", attribute_type=dpg.mvNode_Attr_Output):
-                dpg.add_spacer(width=80, height=5)  # Spacer invisível pra dar tamanho
+            # Atributo de saída contém diretamente a imagem para alinhar o pin ao centro
+            with dpg.node_attribute(
+                label="Output", attribute_type=dpg.mvNode_Attr_Output
+            ):
+                if dpg.does_item_exist("tex_abrir"):
+                    # Imagem quadrada e compacta que domina o node
+                    dpg.add_image("tex_abrir", width=70, height=70)
+                else:
+                    dpg.add_text("Abrir")
 
         # Aplicar tema ao node
         dpg.bind_item_theme(node_id, "theme_abrir")
 
         print(f"Node 'Abrir' adicionado: {node_id}")
+
+    def add_zed_node(self):
+        """Adiciona um novo node 'Zed' no editor"""
+        if not dpg.does_item_exist("map_node_editor"):
+            print("Node Editor não existe ainda!")
+            return
+
+        # Gerar ID único para o node
+        import random
+
+        node_id = f"node_zed_{random.randint(1000, 9999)}"
+
+        # Criar tema customizado para node "Zed" (azul)
+        if not dpg.does_item_exist("theme_zed"):
+            with dpg.theme(tag="theme_zed"):
+                with dpg.theme_component(dpg.mvNode):
+                    # Fundo do node (azul claro)
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_NodeBackground,
+                        (100, 150, 255, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    # Fundo quando hover
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_NodeBackgroundHovered,
+                        (120, 170, 255, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    # Fundo quando selecionado
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_NodeBackgroundSelected,
+                        (150, 200, 255, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    # Barra de título (azul escuro)
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_TitleBar,
+                        (50, 100, 200, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    # Barra de título hover
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_TitleBarHovered,
+                        (70, 120, 220, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+                    # Barra de título selecionado
+                    dpg.add_theme_color(
+                        dpg.mvNodeCol_TitleBarSelected,
+                        (90, 140, 240, 255),
+                        category=dpg.mvThemeCat_Nodes,
+                    )
+
+        # Criar node no editor
+        with dpg.node(
+            label="  Zed  ", tag=node_id, parent="map_node_editor", pos=(400, 250)
+        ):
+            # Input - recebe contexto
+            with dpg.node_attribute(
+                label="Input", attribute_type=dpg.mvNode_Attr_Input
+            ):
+                dpg.add_spacer(width=5, height=5)
+
+            # Conteúdo central - Imagem do Zed
+            with dpg.node_attribute(
+                label="Content", attribute_type=dpg.mvNode_Attr_Static
+            ):
+                if dpg.does_item_exist("tex_zed"):
+                    with dpg.group(horizontal=True):
+                        dpg.add_spacer(width=10)  # Espaço esquerda
+                        dpg.add_image("tex_zed", width=60, height=60)
+                        dpg.add_spacer(width=10)  # Espaço direita
+                else:
+                    dpg.add_text("Zed")
+
+            # Output - passa contexto pra frente
+            with dpg.node_attribute(
+                label="Output", attribute_type=dpg.mvNode_Attr_Output
+            ):
+                dpg.add_spacer(width=5, height=5)
+
+        # Aplicar tema ao node
+        dpg.bind_item_theme(node_id, "theme_zed")
+
+        print(f"Node 'Zed' adicionado: {node_id}")
+
+    def add_claude_node(self):
+        """Adiciona um novo node 'Claude' no editor"""
+        if not dpg.does_item_exist("map_node_editor"):
+            print("Node Editor não existe ainda!")
+            return
+
+        # Gerar ID único para o node
+        import random
+
+        node_id = f"node_claude_{random.randint(1000, 9999)}"
+
+        # Criar node no editor (sem tema customizado - usa padrão)
+        with dpg.node(
+            label="  Claude  ", tag=node_id, parent="map_node_editor", pos=(400, 350)
+        ):
+            # Input - recebe contexto
+            with dpg.node_attribute(
+                label="Input", attribute_type=dpg.mvNode_Attr_Input
+            ):
+                dpg.add_spacer(width=5, height=5)
+
+            # Conteúdo central - Imagem do Claude
+            with dpg.node_attribute(
+                label="Content", attribute_type=dpg.mvNode_Attr_Static
+            ):
+                if dpg.does_item_exist("tex_claude"):
+                    with dpg.group(horizontal=True):
+                        dpg.add_spacer(width=10)  # Espaço esquerda
+                        dpg.add_image("tex_claude", width=60, height=60)
+                        dpg.add_spacer(width=10)  # Espaço direita
+                else:
+                    dpg.add_text("Claude")
+
+            # Output - passa contexto pra frente
+            with dpg.node_attribute(
+                label="Output", attribute_type=dpg.mvNode_Attr_Output
+            ):
+                dpg.add_spacer(width=5, height=5)
+
+        # Node usa tema padrão (sem customização)
+
+        print(f"Node 'Claude' adicionado: {node_id}")
 
     def link_callback(self, sender, app_data):
         """Callback quando usuário conecta nodes"""
@@ -190,7 +402,7 @@ class Arquiteto:
                 height=height,
                 default_value=data,
                 tag="tex_projeto_iniciado",
-                parent="texture_registry"
+                parent="texture_registry",
             )
             print(f"Textura carregada: projeto_iniciado.png ({width}x{height})")
 
@@ -203,15 +415,45 @@ class Arquiteto:
                 height=height,
                 default_value=data,
                 tag="tex_abrir",
-                parent="texture_registry"
+                parent="texture_registry",
             )
             print(f"Textura carregada: abrir.png ({width}x{height})")
 
+        # Carregar imagens dos programas
+        apps_path = str(project_root / "assets" / "apps")
+
+        # Zed
+        zed_path = os.path.join(apps_path, "zed-logo.png")
+        if os.path.exists(zed_path):
+            width, height, channels, data = dpg.load_image(zed_path)
+            dpg.add_static_texture(
+                width=width,
+                height=height,
+                default_value=data,
+                tag="tex_zed",
+                parent="texture_registry",
+            )
+            print(f"Textura carregada: zed-logo.png ({width}x{height})")
+
+        # Claude AI
+        claude_path = os.path.join(apps_path, "claude-ai-icon.png")
+        if os.path.exists(claude_path):
+            width, height, channels, data = dpg.load_image(claude_path)
+            dpg.add_static_texture(
+                width=width,
+                height=height,
+                default_value=data,
+                tag="tex_claude",
+                parent="texture_registry",
+            )
+            print(f"Textura carregada: claude-ai-icon.png ({width}x{height})")
+
         self.textures_loaded = True
 
-    def create_node_card(self, label, color, callback, tag, image_tag=None):
+    def create_node_card(
+        self, label, color, callback, tag, image_tag=None, card_size=100
+    ):
         """Cria um card visual para a paleta de nodes"""
-        card_size = 100
 
         if image_tag and dpg.does_item_exist(image_tag):
             # Card com imagem usando image_button
@@ -221,8 +463,8 @@ class Arquiteto:
                     texture_tag=image_tag,
                     callback=callback,
                     width=card_size,
-                    height=card_size-25,
-                    tag=f"{tag}_btn"
+                    height=card_size - 25,
+                    tag=f"{tag}_btn",
                 )
                 # Texto abaixo
                 dpg.add_text(label, color=(220, 220, 220))
@@ -232,15 +474,38 @@ class Arquiteto:
                 # Criar tema customizado para este card
                 with dpg.theme(tag=f"{tag}_theme"):
                     with dpg.theme_component(dpg.mvButton):
-                        dpg.add_theme_color(dpg.mvThemeCol_Button, color, category=dpg.mvThemeCat_Core)
-                        dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered,
-                                           (min(255, color[0]+30), min(255, color[1]+30), min(255, color[2]+30)),
-                                           category=dpg.mvThemeCat_Core)
-                        dpg.add_theme_color(dpg.mvThemeCol_ButtonActive,
-                                           (min(255, color[0]+50), min(255, color[1]+50), min(255, color[2]+50)),
-                                           category=dpg.mvThemeCat_Core)
-                        dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 8, category=dpg.mvThemeCat_Core)
-                        dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 10, 10, category=dpg.mvThemeCat_Core)
+                        dpg.add_theme_color(
+                            dpg.mvThemeCol_Button, color, category=dpg.mvThemeCat_Core
+                        )
+                        dpg.add_theme_color(
+                            dpg.mvThemeCol_ButtonHovered,
+                            (
+                                min(255, color[0] + 30),
+                                min(255, color[1] + 30),
+                                min(255, color[2] + 30),
+                            ),
+                            category=dpg.mvThemeCat_Core,
+                        )
+                        dpg.add_theme_color(
+                            dpg.mvThemeCol_ButtonActive,
+                            (
+                                min(255, color[0] + 50),
+                                min(255, color[1] + 50),
+                                min(255, color[2] + 50),
+                            ),
+                            category=dpg.mvThemeCat_Core,
+                        )
+                        dpg.add_theme_style(
+                            dpg.mvStyleVar_FrameRounding,
+                            8,
+                            category=dpg.mvThemeCat_Core,
+                        )
+                        dpg.add_theme_style(
+                            dpg.mvStyleVar_FramePadding,
+                            10,
+                            10,
+                            category=dpg.mvThemeCat_Core,
+                        )
 
                 # Criar o botão como card
                 btn = dpg.add_button(
@@ -248,7 +513,7 @@ class Arquiteto:
                     callback=callback,
                     width=card_size,
                     height=card_size,
-                    tag=f"{tag}_btn"
+                    tag=f"{tag}_btn",
                 )
 
                 # Aplicar tema ao botão
@@ -256,7 +521,9 @@ class Arquiteto:
 
     def update_node_coordinates(self):
         """Atualiza display de coordenadas dos nodes selecionados"""
-        if not dpg.does_item_exist("map_node_editor") or not dpg.does_item_exist("map_coords_display"):
+        if not dpg.does_item_exist("map_node_editor") or not dpg.does_item_exist(
+            "map_coords_display"
+        ):
             return
 
         # Pegar nodes selecionados
@@ -289,21 +556,36 @@ class Arquiteto:
             with dpg.group(horizontal=True):
                 # Botão "Adicionar Node" com popup
                 add_node_btn = dpg.add_button(label="Adicionar Node")
-                with dpg.popup(add_node_btn, modal=False, mousebutton=dpg.mvMouseButton_Left):
-                    dpg.add_menu_item(label="Projeto Iniciado", callback=self.add_projeto_iniciado_node)
+                with dpg.popup(
+                    add_node_btn, modal=False, mousebutton=dpg.mvMouseButton_Left
+                ):
+                    dpg.add_menu_item(
+                        label="Projeto Iniciado",
+                        callback=self.add_projeto_iniciado_node,
+                    )
                     dpg.add_menu_item(label="Abrir", callback=self.add_abrir_node)
 
                 # Botão "Editar" com popup
                 editar_btn = dpg.add_button(label="Editar")
-                with dpg.popup(editar_btn, modal=False, mousebutton=dpg.mvMouseButton_Left):
-                    dpg.add_menu_item(label="Deletar Nodes Selecionados", callback=self.delete_selected_nodes)
-                    dpg.add_menu_item(label="Deletar Links Selecionados", callback=self.delete_selected_links)
+                with dpg.popup(
+                    editar_btn, modal=False, mousebutton=dpg.mvMouseButton_Left
+                ):
+                    dpg.add_menu_item(
+                        label="Deletar Nodes Selecionados",
+                        callback=self.delete_selected_nodes,
+                    )
+                    dpg.add_menu_item(
+                        label="Deletar Links Selecionados",
+                        callback=self.delete_selected_links,
+                    )
                     dpg.add_separator()
                     dpg.add_menu_item(label="Limpar Tudo", callback=self.clear_editor)
 
                 # Botão "Arquivo" com popup
                 arquivo_btn = dpg.add_button(label="Arquivo")
-                with dpg.popup(arquivo_btn, modal=False, mousebutton=dpg.mvMouseButton_Left):
+                with dpg.popup(
+                    arquivo_btn, modal=False, mousebutton=dpg.mvMouseButton_Left
+                ):
                     dpg.add_menu_item(label="Salvar", callback=self.menu_callback)
                     dpg.add_menu_item(label="Carregar", callback=self.menu_callback)
 
@@ -317,7 +599,7 @@ class Arquiteto:
                             dpg.mvStyleVar_CellPadding,
                             0,
                             0,
-                            category=dpg.mvThemeCat_Core
+                            category=dpg.mvThemeCat_Core,
                         )
 
             # Layout horizontal: Node Editor + Painel Lateral usando tabela para evitar overflow
@@ -329,7 +611,7 @@ class Arquiteto:
                 borders_outerV=False,
                 policy=dpg.mvTable_SizingStretchProp,
                 resizable=False,
-                tag="map_layout_table"
+                tag="map_layout_table",
             ) as map_layout_table:
                 dpg.bind_item_theme(map_layout_table, "map_layout_table_theme")
 
@@ -339,23 +621,35 @@ class Arquiteto:
                 with dpg.table_row():
                     # Coluna esquerda - Node Editor ocupa todo espaço restante
                     with dpg.table_cell():
-                        with dpg.child_window(height=-50, border=False, horizontal_scrollbar=False):
+                        with dpg.child_window(
+                            height=-50, border=False, horizontal_scrollbar=False
+                        ):
                             with dpg.node_editor(
                                 callback=self.link_callback,
                                 delink_callback=self.delink_callback,
-                                tag="map_node_editor"
+                                tag="map_node_editor",
                             ):
                                 # Node: Projeto Iniciado
-                                with dpg.node(label="Projeto Iniciado", tag="node_projeto_iniciado", pos=(20, 20)):
-                                    with dpg.node_attribute(label="projectStarted", attribute_type=dpg.mvNode_Attr_Static):
+                                with dpg.node(
+                                    label="Projeto Iniciado",
+                                    tag="node_projeto_iniciado",
+                                    pos=(20, 20),
+                                ):
+                                    with dpg.node_attribute(
+                                        label="projectStarted",
+                                        attribute_type=dpg.mvNode_Attr_Static,
+                                    ):
                                         dpg.add_input_text(
                                             label="Nome do Projeto",
                                             tag="project_started_input",
                                             hint="Ex: uberti, mecanica, amage...",
-                                            width=200
+                                            width=200,
                                         )
 
-                                    with dpg.node_attribute(label="Output", attribute_type=dpg.mvNode_Attr_Output):
+                                    with dpg.node_attribute(
+                                        label="Output",
+                                        attribute_type=dpg.mvNode_Attr_Output,
+                                    ):
                                         dpg.add_text("Projeto ->")
 
                     # Coluna direita - Painel de Paleta (250px fixo)
@@ -367,10 +661,15 @@ class Arquiteto:
                                         dpg.mvStyleVar_WindowPadding,
                                         12,
                                         12,
-                                        category=dpg.mvThemeCat_Core
+                                        category=dpg.mvThemeCat_Core,
                                     )
 
-                        with dpg.child_window(height=-50, border=True, tag="palette_panel", horizontal_scrollbar=False):
+                        with dpg.child_window(
+                            height=300,
+                            border=True,
+                            tag="palette_panel",
+                            horizontal_scrollbar=False,
+                        ):
                             dpg.bind_item_theme("palette_panel", "palette_panel_theme")
                             dpg.add_text("Nodes Disponíveis", color=(200, 200, 200))
                             dpg.add_separator()
@@ -385,15 +684,15 @@ class Arquiteto:
                                     color=(100, 150, 255),
                                     callback=self.add_projeto_iniciado_node,
                                     tag="card_projeto_iniciado",
-                                    image_tag="tex_projeto_iniciado"
+                                    image_tag="tex_projeto_iniciado",
                                 ),
                                 dict(
                                     label="Abrir",
                                     color=(150, 255, 150),
                                     callback=self.add_abrir_node,
                                     tag="card_abrir",
-                                    image_tag="tex_abrir"
-                                )
+                                    image_tag="tex_abrir",
+                                ),
                             ]
 
                             if not dpg.does_item_exist("palette_grid_theme"):
@@ -403,7 +702,7 @@ class Arquiteto:
                                             dpg.mvStyleVar_CellPadding,
                                             8,
                                             8,
-                                            category=dpg.mvThemeCat_Core
+                                            category=dpg.mvThemeCat_Core,
                                         )
 
                             with dpg.table(
@@ -414,12 +713,18 @@ class Arquiteto:
                                 borders_outerV=False,
                                 policy=dpg.mvTable_SizingStretchProp,
                                 resizable=False,
-                                tag="palette_grid_table"
+                                tag="palette_grid_table",
                             ) as palette_grid_table:
-                                dpg.bind_item_theme(palette_grid_table, "palette_grid_theme")
+                                dpg.bind_item_theme(
+                                    palette_grid_table, "palette_grid_theme"
+                                )
 
-                                dpg.add_table_column(width_stretch=True, init_width_or_weight=1.0)
-                                dpg.add_table_column(width_stretch=True, init_width_or_weight=1.0)
+                                dpg.add_table_column(
+                                    width_stretch=True, init_width_or_weight=1.0
+                                )
+                                dpg.add_table_column(
+                                    width_stretch=True, init_width_or_weight=1.0
+                                )
 
                                 for index in range(0, len(card_definitions), 2):
                                     with dpg.table_row():
@@ -432,31 +737,129 @@ class Arquiteto:
                                                 else:
                                                     dpg.add_spacer(height=1)
 
+                        # Separador entre Nodes e Programas
+                        dpg.add_spacer(height=15)
+                        dpg.add_separator()
+                        dpg.add_spacer(height=15)
+
+                        # Painel de Programas Disponíveis
+                        with dpg.child_window(
+                            height=-50,
+                            border=True,
+                            tag="programs_panel",
+                            horizontal_scrollbar=False,
+                        ):
+                            dpg.bind_item_theme("programs_panel", "palette_panel_theme")
+                            dpg.add_text("Programas Disponíveis", color=(200, 200, 200))
+                            dpg.add_separator()
+                            dpg.add_spacer(height=10)
+
+                            program_cards = [
+                                dict(
+                                    label="Zed",
+                                    color=(70, 130, 255),
+                                    callback=self.add_zed_node,
+                                    tag="card_zed",
+                                    image_tag="tex_zed",
+                                    card_size=80,
+                                ),
+                                dict(
+                                    label="Claude",
+                                    color=(217, 119, 87),
+                                    callback=self.add_claude_node,
+                                    tag="card_claude",
+                                    image_tag="tex_claude",
+                                    card_size=80,
+                                ),
+                            ]
+
+                            if not dpg.does_item_exist("programs_grid_theme"):
+                                with dpg.theme(tag="programs_grid_theme"):
+                                    with dpg.theme_component(dpg.mvTable):
+                                        dpg.add_theme_style(
+                                            dpg.mvStyleVar_CellPadding,
+                                            6,
+                                            6,
+                                            category=dpg.mvThemeCat_Core,
+                                        )
+
+                            with dpg.table(
+                                header_row=False,
+                                borders_innerH=False,
+                                borders_innerV=False,
+                                borders_outerH=False,
+                                borders_outerV=False,
+                                policy=dpg.mvTable_SizingStretchProp,
+                                resizable=False,
+                                tag="programs_grid_table",
+                            ) as programs_grid_table:
+                                dpg.bind_item_theme(
+                                    programs_grid_table, "programs_grid_theme"
+                                )
+
+                                dpg.add_table_column(
+                                    width_stretch=True, init_width_or_weight=1.0
+                                )
+                                dpg.add_table_column(
+                                    width_stretch=True, init_width_or_weight=1.0
+                                )
+                                dpg.add_table_column(
+                                    width_stretch=True, init_width_or_weight=1.0
+                                )
+
+                                for index in range(0, len(program_cards), 3):
+                                    with dpg.table_row():
+                                        for offset in range(3):
+                                            card_idx = index + offset
+                                            with dpg.table_cell():
+                                                if card_idx < len(program_cards):
+                                                    card = program_cards[card_idx]
+                                                    self.create_node_card(**card)
+                                                else:
+                                                    dpg.add_spacer(height=1)
+
             # Painel de coordenadas no canto inferior esquerdo
             dpg.add_spacer(height=10)
             with dpg.group(horizontal=True):
                 dpg.add_text("Coordenadas:", color=(150, 150, 150))
-                dpg.add_text("Selecione um node", tag="map_coords_display", color=(100, 200, 255))
+                dpg.add_text(
+                    "Selecione um node", tag="map_coords_display", color=(100, 200, 255)
+                )
 
         # Selecionar a nova aba
         dpg.set_value("main_tab_bar", "map_tab")
         print("Aba Map criada com Node Editor")
 
     def handle_delete_key(self):
-        """Handler para tecla Delete - deleta nodes selecionados"""
+        """Handler para tecla Delete - deleta nodes e links selecionados"""
         if not dpg.does_item_exist("map_node_editor"):
             return
 
         # Pegar nodes selecionados
         selected_nodes = dpg.get_selected_nodes("map_node_editor")
 
+        # Pegar links selecionados
+        selected_links = dpg.get_selected_links("map_node_editor")
+
+        # Deletar nodes
         if selected_nodes and len(selected_nodes) > 0:
-            # Deletar cada node selecionado
             for node_id in selected_nodes:
                 dpg.delete_item(node_id)
                 print(f"Node deletado: {node_id}")
 
-            print(f"Total de {len(selected_nodes)} node(s) deletado(s) com tecla Delete")
+            print(
+                f"Total de {len(selected_nodes)} node(s) deletado(s) com tecla Delete"
+            )
+
+        # Deletar links
+        if selected_links and len(selected_links) > 0:
+            for link_id in selected_links:
+                dpg.delete_item(link_id)
+                print(f"Link deletado: {link_id}")
+
+            print(
+                f"Total de {len(selected_links)} link(s) deletado(s) com tecla Delete"
+            )
 
     def setup_gui(self):
         """Configura a interface gráfica do zero"""
@@ -465,14 +868,16 @@ class Arquiteto:
 
         # Registrar handler global para tecla Delete
         with dpg.handler_registry():
-            dpg.add_key_press_handler(dpg.mvKey_Delete, callback=lambda: self.handle_delete_key())
+            dpg.add_key_press_handler(
+                dpg.mvKey_Delete, callback=lambda: self.handle_delete_key()
+            )
 
         # Criar viewport
         dpg.create_viewport(
             title="Arquiteto - Gerenciador de Projetos",
             width=1200,
             height=800,
-            resizable=True
+            resizable=True,
         )
 
         # Criar janela principal com Menu Bar
@@ -480,14 +885,16 @@ class Arquiteto:
             tag="main_window",
             label="Arquiteto",
             no_scrollbar=True,
-            no_scroll_with_mouse=True
+            no_scroll_with_mouse=True,
         ):
             # Menu Bar
             with dpg.menu_bar():
                 with dpg.menu(label="Inicio"):
                     dpg.add_menu_item(label="Dashboard", callback=self.menu_callback)
                     dpg.add_separator()
-                    dpg.add_menu_item(label="Sair", callback=lambda: dpg.stop_dearpygui())
+                    dpg.add_menu_item(
+                        label="Sair", callback=lambda: dpg.stop_dearpygui()
+                    )
 
                 # Menu Map para abrir Node Editor
                 dpg.add_menu_item(label="Map", callback=self.show_map_tab)
