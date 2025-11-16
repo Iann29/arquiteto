@@ -1,0 +1,1002 @@
+#!/usr/bin/env python3
+"""
+Arquiteto - Gerenciador de Projetos
+Interface moderna e organizada
+"""
+
+import dearpygui.dearpygui as dpg
+from screeninfo import get_monitors
+import subprocess
+import json
+import time
+import os
+from pathlib import Path
+from datetime import datetime
+
+# Importar modulos do Arquiteto
+from database import Database
+from project_manager import ProjectManager
+from workspace_manager import WorkspaceManager
+from ram_monitor import RAMMonitor
+from constants import AVAILABLE_APPS
+from zen_controller import ZenController
+
+
+class Arquiteto:
+    def __init__(self):
+        # Configuracoes gerais
+        self.monitors = []
+        self.current_workspace = None
+        self.current_workspace_name = "Desconhecido"
+        self.capturing_hotkey = False
+        self.capture_target_tag = None
+        self.window_width = 1200
+        self.window_height = 800
+        self.window_title = "Arquiteto"
+
+        # Modulos
+        self.db = Database()
+        self.project_manager = ProjectManager(self.db)
+        self.workspace_manager = WorkspaceManager()
+        self.ram_monitor = RAMMonitor()
+        self.zen_controller = ZenController()
+
+        # Reset: desativar todos os projetos ao iniciar (evita projetos fantasmas)
+        self.db.deactivate_all_projects()
+
+        # Estado
+        self.current_view = "projects"
+        self.wizard_data = {}
+        self.projects_per_row = 3  # Grid 3 colunas
+
+    def detect_monitors(self):
+        """Detecta todos os monitores conectados"""
+        self.monitors = get_monitors()
+
+    def find_arquiteto_window(self):
+        """Encontra o endereco da janela do Arquiteto"""
+        try:
+            result = subprocess.run(
+                ["hyprctl", "clients", "-j"],
+                capture_output=True,
+                text=True,
+                timeout=1
+            )
+
+            if result.returncode == 0:
+                clients = json.loads(result.stdout)
+                for client in clients:
+                    if self.window_title in client.get("title", ""):
+                        return client
+        except:
+            pass
+        return None
+
+    def get_hyprland_workspace(self):
+        """Detecta o workspace do Hyprland onde a janela esta"""
+        window = self.find_arquiteto_window()
+        if window:
+            workspace = window.get("workspace", {})
+            self.current_workspace = workspace.get("id")
+            self.current_workspace_name = workspace.get("name", str(self.current_workspace))
+            return self.current_workspace
+        return None
+
+    def move_to_workspace_9(self):
+        """Move Arquiteto para workspace 9"""
+        time.sleep(0.3)
+        window = self.find_arquiteto_window()
+        if not window:
+            return
+
+        arquiteto_address = window.get("address", "")
+        if arquiteto_address:
+            subprocess.run(
+                ["hyprctl", "dispatch", "movetoworkspacesilent", f"9,address:{arquiteto_address}"],
+                capture_output=True,
+                timeout=1
+            )
+            time.sleep(0.1)
+            subprocess.run(
+                ["hyprctl", "dispatch", "workspace", "9"],
+                capture_output=True,
+                timeout=1
+            )
+
+    def get_project_stats(self, folder_path):
+        """Obtem estatisticas do projeto"""
+        stats = {
+            "total_files": 0,
+            "git_branch": None,
+            "last_modified": None
+        }
+
+        try:
+            # Contar arquivos no diretorio
+            if os.path.exists(folder_path):
+                stats["total_files"] = sum([len(files) for _, _, files in os.walk(folder_path)])
+
+                # Tentar detectar branch do git
+                git_dir = Path(folder_path) / ".git"
+                if git_dir.exists():
+                    result = subprocess.run(
+                        ["git", "-C", folder_path, "branch", "--show-current"],
+                        capture_output=True,
+                        text=True,
+                        timeout=1
+                    )
+                    if result.returncode == 0:
+                        stats["git_branch"] = result.stdout.strip() or "main"
+
+                # Data de ultima modificacao
+                path_obj = Path(folder_path)
+                if path_obj.exists():
+                    stats["last_modified"] = datetime.fromtimestamp(path_obj.stat().st_mtime)
+        except:
+            pass
+
+        return stats
+
+    def format_time_ago(self, timestamp_str):
+        """Formata timestamp para 'X horas atras'"""
+        if not timestamp_str:
+            return "Nunca"
+
+        try:
+            dt = datetime.fromisoformat(timestamp_str)
+            now = datetime.now()
+            diff = now - dt
+
+            if diff.days > 0:
+                return f"Ha {diff.days} dia(s)"
+            elif diff.seconds >= 3600:
+                hours = diff.seconds // 3600
+                return f"Ha {hours} hora(s)"
+            elif diff.seconds >= 60:
+                minutes = diff.seconds // 60
+                return f"Ha {minutes} minuto(s)"
+            else:
+                return "Agora mesmo"
+        except:
+            return "Desconhecido"
+
+    def on_resize(self):
+        """Callback para redimensionamento"""
+        vw = dpg.get_viewport_width()
+        vh = dpg.get_viewport_height()
+
+        # Atualizar janela principal
+        if dpg.does_item_exist("main_window"):
+            dpg.set_item_width("main_window", vw)
+            dpg.set_item_height("main_window", vh)
+
+        # Atualizar grid responsivo
+        old_per_row = self.projects_per_row
+
+        if vw < 900:
+            self.projects_per_row = 1
+        elif vw < 1300:
+            self.projects_per_row = 2
+        else:
+            self.projects_per_row = 3
+
+        # Se mudou, redesenhar grid
+        if old_per_row != self.projects_per_row:
+            self.refresh_project_list()
+
+    def update_window_info(self):
+        """Atualiza informacoes da janela e RAM"""
+        self.get_hyprland_workspace()
+
+        # Atualizar workspace
+        if dpg.does_item_exist("workspace_value"):
+            if self.current_workspace is not None:
+                dpg.set_value("workspace_value", f"{self.current_workspace_name}")
+
+        # Atualizar RAM
+        if dpg.does_item_exist("ram_value"):
+            info = self.ram_monitor.get_ram_info()
+            ram_text = f"{info['used_gb']:.1f}GB / {info['total_gb']:.0f}GB"
+            dpg.set_value("ram_value", ram_text)
+
+            # Cor baseada no status
+            if info['is_critical']:
+                dpg.configure_item("ram_value", color=(255, 50, 50))
+            elif info['is_warning']:
+                dpg.configure_item("ram_value", color=(255, 200, 0))
+            else:
+                dpg.configure_item("ram_value", color=(100, 255, 100))
+
+        # Atualizar projeto ativo
+        if dpg.does_item_exist("active_project_value"):
+            active_project = self.db.get_active_project()
+            if active_project:
+                dpg.set_value("active_project_value", active_project['name'])
+                dpg.configure_item("active_project_value", color=(100, 255, 100))
+            else:
+                dpg.set_value("active_project_value", "Nenhum")
+                dpg.configure_item("active_project_value", color=(150, 150, 150))
+
+    def setup_theme(self):
+        """Tema moderno"""
+        with dpg.theme() as global_theme:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 8)
+                dpg.add_theme_style(dpg.mvStyleVar_WindowRounding, 12)
+                dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 12, 8)
+                dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 12, 12)
+                dpg.add_theme_style(dpg.mvStyleVar_ChildRounding, 12)
+                dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 20, 20)
+
+        dpg.bind_theme(global_theme)
+
+        # Botao vermelho
+        with dpg.theme() as self.red_button_theme:
+            with dpg.theme_component(dpg.mvButton):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (200, 50, 50))
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (230, 70, 70))
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (180, 30, 30))
+
+        # Botao verde
+        with dpg.theme() as self.green_button_theme:
+            with dpg.theme_component(dpg.mvButton):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (50, 200, 50))
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (70, 230, 70))
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 180, 30))
+
+        # Botao azul
+        with dpg.theme() as self.blue_button_theme:
+            with dpg.theme_component(dpg.mvButton):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (50, 130, 200))
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (70, 150, 230))
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (30, 110, 180))
+
+    def refresh_project_list(self):
+        """Atualiza a lista de projetos em grid"""
+        if not dpg.does_item_exist("projects_grid"):
+            return
+
+        # Limpar grid
+        dpg.delete_item("projects_grid", children_only=True)
+
+        # Pegar todos os projetos
+        projects = self.db.get_all_projects()
+
+        if not projects:
+            dpg.add_text(
+                "Nenhum projeto cadastrado",
+                color=(150, 150, 150),
+                parent="projects_grid"
+            )
+            dpg.add_spacer(height=10, parent="projects_grid")
+            dpg.add_text(
+                "Clique em 'Novo Projeto' para comecar!",
+                color=(150, 150, 150),
+                parent="projects_grid"
+            )
+        else:
+            # Criar grid de projetos
+            current_row = None
+            for i, project in enumerate(projects):
+                # Criar nova linha a cada N projetos
+                if i % self.projects_per_row == 0:
+                    current_row = dpg.add_group(horizontal=True, parent="projects_grid")
+
+                self.create_project_card(project, current_row)
+
+    def create_project_card(self, project, parent_group):
+        """Cria um card de projeto moderno"""
+        is_active = project.get("is_active", 0) == 1
+        stats = self.get_project_stats(project["folder_path"])
+
+        # Calcular largura dinamica baseado no viewport
+        viewport_width = dpg.get_viewport_width()
+        padding = 40
+        spacing = 15
+
+        if self.projects_per_row == 1:
+            card_width = viewport_width - padding
+        elif self.projects_per_row == 2:
+            card_width = (viewport_width - padding - spacing) / 2
+        else:
+            card_width = (viewport_width - padding - (spacing * 2)) / 3
+
+        card_width = max(card_width, 300)  # minimo 300px
+        card_height = 220
+
+        with dpg.child_window(
+            width=card_width,
+            height=card_height,
+            border=True,
+            parent=parent_group
+        ):
+            # Header do card
+            with dpg.group(horizontal=True):
+                # Nome do projeto
+                dpg.add_text(
+                    project["name"],
+                    color=(100, 255, 100) if is_active else (255, 255, 255)
+                )
+
+                # Badge ATIVO
+                if is_active:
+                    dpg.add_spacer(width=10)
+                    with dpg.child_window(width=70, height=25, border=False):
+                        dpg.add_text(" ATIVO ", color=(0, 0, 0))
+                        # TODO: Aplicar background verde no child_window
+
+            dpg.add_separator()
+            dpg.add_spacer(height=5)
+
+            # Informacoes do projeto
+            dpg.add_text(f"Pasta:", color=(120, 120, 120))
+            dpg.add_text(f"  {project['folder_path'][:40]}...", color=(180, 180, 180))
+
+            dpg.add_spacer(height=5)
+
+            # Apps configurados
+            apps = []
+            for ws_num in [1, 2, 3]:
+                app = project.get(f"workspace_{ws_num}_app")
+                if app:
+                    apps.append(f"WS{ws_num}:{app}")
+
+            if apps:
+                dpg.add_text(f"Apps: {', '.join(apps)}", color=(150, 200, 255))
+
+            # Estatisticas
+            dpg.add_spacer(height=5)
+            stat_text = f"Arquivos: {stats['total_files']}"
+            if stats['git_branch']:
+                stat_text += f" | Branch: {stats['git_branch']}"
+            dpg.add_text(stat_text, color=(255, 200, 100))
+
+            # Ultima vez usado
+            last_used = self.format_time_ago(project.get("last_opened"))
+            dpg.add_text(f"Ultimo uso: {last_used}", color=(150, 150, 150))
+
+            dpg.add_spacer(height=8)
+
+            # Botoes de acao
+            with dpg.group(horizontal=True):
+                open_btn = dpg.add_button(
+                    label="Abrir",
+                    callback=lambda: self.open_project_callback(project["id"]),
+                    width=90
+                )
+                if not is_active:
+                    dpg.bind_item_theme(open_btn, self.green_button_theme)
+
+                edit_btn = dpg.add_button(
+                    label="Editar",
+                    callback=lambda: self.edit_project_callback(project["id"]),
+                    width=90
+                )
+                dpg.bind_item_theme(edit_btn, self.blue_button_theme)
+
+                delete_btn = dpg.add_button(
+                    label="Deletar",
+                    callback=lambda: self.delete_project_callback(project["id"]),
+                    width=90
+                )
+                dpg.bind_item_theme(delete_btn, self.red_button_theme)
+
+    def open_project_callback(self, project_id):
+        """Callback para abrir projeto"""
+        print(f"Abrindo projeto ID: {project_id}")
+        success = self.project_manager.switch_project(project_id)
+        if success:
+            self.refresh_project_list()
+            self.update_window_info()
+
+    def edit_project_callback(self, project_id):
+        """Callback para editar projeto"""
+        self.show_project_wizard(project_id=project_id)
+
+    def delete_project_callback(self, project_id):
+        """Callback para deletar projeto"""
+        print(f"Deletando projeto ID: {project_id}")
+        self.db.delete_project(project_id)
+        self.refresh_project_list()
+
+    def new_project_callback(self):
+        """Callback para criar novo projeto"""
+        self.show_project_wizard(project_id=None)
+
+    def emergency_callback(self):
+        """Callback para botao de emergencia"""
+        print("EMERGENCIA: Fechando tudo!")
+        self.project_manager.emergency_close_all()
+        self.refresh_project_list()
+        self.update_window_info()
+
+    def wizard_close_callback(self):
+        """Callback quando wizard fecha - garante limpeza da tag"""
+        if dpg.does_item_exist("project_wizard_modal"):
+            dpg.delete_item("project_wizard_modal")
+
+    def browse_folder_callback(self):
+        """Abre file dialog para selecionar pasta"""
+        # Esconder wizard temporariamente para o file_dialog ficar visivel
+        if dpg.does_item_exist("project_wizard_modal"):
+            dpg.hide_item("project_wizard_modal")
+
+        with dpg.file_dialog(
+            directory_selector=True,
+            show=True,
+            callback=self.folder_selected_callback,
+            cancel_callback=self.folder_cancel_callback,
+            tag="folder_dialog",
+            width=700,
+            height=400
+        ):
+            dpg.add_file_extension(".*")
+
+    def folder_selected_callback(self, sender, app_data):
+        """Callback quando pasta e selecionada"""
+        selections = app_data.get('selections', {})
+        if selections:
+            folder_path = list(selections.values())[0]
+            # Setar valor apenas se wizard ainda existe
+            if dpg.does_item_exist("wizard_folder"):
+                dpg.set_value("wizard_folder", folder_path)
+
+        # Mostrar wizard novamente
+        if dpg.does_item_exist("project_wizard_modal"):
+            dpg.show_item("project_wizard_modal")
+
+        # Deletar file_dialog apos uso
+        if dpg.does_item_exist("folder_dialog"):
+            dpg.delete_item("folder_dialog")
+
+    def folder_cancel_callback(self):
+        """Callback quando file_dialog e cancelado"""
+        # Mostrar wizard novamente
+        if dpg.does_item_exist("project_wizard_modal"):
+            dpg.show_item("project_wizard_modal")
+
+        # Deletar file_dialog
+        if dpg.does_item_exist("folder_dialog"):
+            dpg.delete_item("folder_dialog")
+
+    def capture_hotkey_handler(self):
+        """Handler que captura teclas pressionadas em tempo real"""
+        if not self.capturing_hotkey:
+            return
+
+        # Mapa de teclas do DearPyGUI para nomes wtype
+        # APENAS teclas que realmente existem no DearPyGUI!
+        key_map = {
+            dpg.mvKey_Minus: "minus",
+            dpg.mvKey_Plus: "plus",
+            dpg.mvKey_Comma: "comma",
+            dpg.mvKey_Period: "period",
+            dpg.mvKey_Slash: "slash",
+            dpg.mvKey_Backslash: "backslash",
+            dpg.mvKey_Colon: "semicolon",  # Representa : e ;
+            dpg.mvKey_Quote: "apostrophe",  # Representa '
+            dpg.mvKey_Open_Brace: "bracketleft",
+            dpg.mvKey_Close_Brace: "bracketright",
+            dpg.mvKey_Tilde: "grave",  # Representa ~ e `
+            dpg.mvKey_Tab: "tab",
+            dpg.mvKey_Return: "return",
+            dpg.mvKey_Escape: "escape",
+            dpg.mvKey_Spacebar: "space",
+            dpg.mvKey_Back: "backspace",
+            dpg.mvKey_Delete: "delete",
+        }
+
+        # Detectar modificadores (usar LControl/RControl ao invés de Control)
+        modifiers = []
+        if dpg.is_key_down(dpg.mvKey_LControl) or dpg.is_key_down(dpg.mvKey_RControl):
+            modifiers.append("ctrl")
+        if dpg.is_key_down(dpg.mvKey_LShift) or dpg.is_key_down(dpg.mvKey_RShift):
+            modifiers.append("shift")
+        if dpg.is_key_down(dpg.mvKey_LAlt) or dpg.is_key_down(dpg.mvKey_RAlt):
+            modifiers.append("alt")
+        if dpg.is_key_down(dpg.mvKey_LWin) or dpg.is_key_down(dpg.mvKey_RWin):
+            modifiers.append("super")
+
+        # Precisamos de pelo menos um modificador
+        if not modifiers:
+            dpg.set_value("capture_modal_text", "Pressione um modificador (Ctrl, Shift, Alt, Super) + tecla...")
+            return
+
+        # Detectar tecla principal (letras a-z)
+        for key_code in range(dpg.mvKey_A, dpg.mvKey_Z + 1):
+            if dpg.is_key_pressed(key_code):
+                key_name = chr(ord('a') + (key_code - dpg.mvKey_A))
+                hotkey_string = "+".join(modifiers + [key_name])
+
+                # Preencher campo e fechar modal
+                dpg.set_value(self.capture_target_tag, hotkey_string)
+                dpg.delete_item("capture_hotkey_modal")
+                self.capturing_hotkey = False
+                return
+
+        # Detectar teclas especiais
+        for key_code, key_name in key_map.items():
+            if dpg.is_key_pressed(key_code):
+                hotkey_string = "+".join(modifiers + [key_name])
+
+                # Preencher campo e fechar modal
+                dpg.set_value(self.capture_target_tag, hotkey_string)
+                dpg.delete_item("capture_hotkey_modal")
+                self.capturing_hotkey = False
+                return
+
+        # Detectar números 0-9
+        for key_code in range(dpg.mvKey_0, dpg.mvKey_9 + 1):
+            if dpg.is_key_pressed(key_code):
+                key_name = str(key_code - dpg.mvKey_0)
+                hotkey_string = "+".join(modifiers + [key_name])
+
+                dpg.set_value(self.capture_target_tag, hotkey_string)
+                dpg.delete_item("capture_hotkey_modal")
+                self.capturing_hotkey = False
+                return
+
+    def open_capture_hotkey_modal(self, target_tag):
+        """Abre modal para capturar atalho de teclado"""
+        # Se modal já existe, deletar primeiro
+        if dpg.does_item_exist("capture_hotkey_modal"):
+            dpg.delete_item("capture_hotkey_modal")
+
+        self.capturing_hotkey = True
+        self.capture_target_tag = target_tag
+
+        # Criar modal
+        with dpg.window(
+            label="Capturar Atalho",
+            modal=True,
+            show=True,
+            tag="capture_hotkey_modal",
+            width=400,
+            height=150,
+            pos=[450, 300],
+            no_resize=True,
+            on_close=lambda: setattr(self, 'capturing_hotkey', False)
+        ):
+            dpg.add_spacer(height=10)
+            dpg.add_text(
+                "Pressione o atalho desejado...",
+                tag="capture_modal_text",
+                color=(100, 200, 255)
+            )
+            dpg.add_spacer(height=10)
+            dpg.add_text(
+                "Exemplos: Ctrl+Shift+E, Ctrl+Alt+Minus",
+                color=(150, 150, 150)
+            )
+            dpg.add_spacer(height=15)
+
+            cancel_btn = dpg.add_button(
+                label="Cancelar",
+                callback=lambda: (dpg.delete_item("capture_hotkey_modal"), setattr(self, 'capturing_hotkey', False)),
+                width=150
+            )
+
+    def save_project_wizard(self, project_id=None):
+        """Salva projeto do wizard"""
+        # Pegar valores dos inputs
+        name = dpg.get_value("wizard_name")
+        folder = dpg.get_value("wizard_folder")
+        zen_container = dpg.get_value("wizard_zen_container")
+        ws1 = dpg.get_value("wizard_ws1")
+        ws2 = dpg.get_value("wizard_ws2")
+        ws3 = dpg.get_value("wizard_ws3")
+        ws1_hotkey = dpg.get_value("wizard_ws1_hotkey")
+        ws2_hotkey = dpg.get_value("wizard_ws2_hotkey")
+        ws3_hotkey = dpg.get_value("wizard_ws3_hotkey")
+        urls_str = dpg.get_value("wizard_urls")
+
+        # Validacoes
+        if not name.strip():
+            dpg.set_value("wizard_error", "Nome nao pode estar vazio!")
+            dpg.configure_item("wizard_error", show=True)
+            return
+
+        if not os.path.exists(folder):
+            dpg.set_value("wizard_error", "Pasta nao existe!")
+            dpg.configure_item("wizard_error", show=True)
+            return
+
+        # Processar URLs
+        urls = [url.strip() for url in urls_str.split(",") if url.strip()]
+
+        # Salvar ou atualizar
+        if project_id:
+            # Atualizar existente
+            self.db.update_project(
+                project_id,
+                name=name,
+                folder_path=folder,
+                zen_container=zen_container,
+                workspace_1_app=ws1,
+                workspace_2_app=ws2,
+                workspace_3_app=ws3,
+                workspace_1_hotkey=ws1_hotkey,
+                workspace_2_hotkey=ws2_hotkey,
+                workspace_3_hotkey=ws3_hotkey,
+                urls=urls
+            )
+        else:
+            # Criar novo
+            self.db.create_project(
+                name=name,
+                folder_path=folder,
+                zen_container=zen_container,
+                workspace_1_app=ws1,
+                workspace_2_app=ws2,
+                workspace_3_app=ws3,
+                workspace_1_hotkey=ws1_hotkey,
+                workspace_2_hotkey=ws2_hotkey,
+                workspace_3_hotkey=ws3_hotkey,
+                urls=urls
+            )
+
+        # Fechar modal e atualizar lista
+        dpg.delete_item("project_wizard_modal")
+        self.refresh_project_list()
+
+    def show_project_wizard(self, project_id=None):
+        """Mostra wizard de criacao/edicao"""
+        # Se project_id nao e None, carregar dados do projeto
+        if project_id:
+            project = self.db.get_project_by_id(project_id)
+            title = f"Editar Projeto: {project['name']}"
+        else:
+            project = None
+            title = "Novo Projeto"
+
+        # Deletar wizard anterior se existir (previne erro "Alias already exists")
+        if dpg.does_item_exist("project_wizard_modal"):
+            dpg.delete_item("project_wizard_modal")
+
+        # Criar modal window
+        with dpg.window(
+            label=title,
+            modal=True,
+            show=True,
+            tag="project_wizard_modal",
+            width=500,
+            height=750,  # Aumentado de 600 para 750 para acomodar campos de hotkey
+            pos=[350, 100],
+            on_close=self.wizard_close_callback
+        ):
+            dpg.add_spacer(height=10)
+
+            # Nome do projeto
+            dpg.add_input_text(
+                label="Nome do Projeto",
+                tag="wizard_name",
+                default_value=project['name'] if project else "",
+                width=350
+            )
+
+            dpg.add_spacer(height=10)
+
+            # Pasta do projeto
+            dpg.add_text("Pasta do Projeto:")
+            with dpg.group(horizontal=True):
+                dpg.add_input_text(
+                    tag="wizard_folder",
+                    default_value=project['folder_path'] if project else "",
+                    width=300
+                )
+                dpg.add_button(
+                    label="Procurar...",
+                    callback=self.browse_folder_callback,
+                    width=100
+                )
+
+            dpg.add_spacer(height=10)
+
+            # Espaço do Zen (workspace)
+            dpg.add_input_text(
+                label="Espaço do Zen (referência)",
+                tag="wizard_zen_container",
+                hint="Digite o nome do espaço (ex: Uberti)",
+                default_value=project.get('zen_container', "") if project else "",
+                width=350
+            )
+            dpg.add_text(
+                "Nota: Workspace deve ser trocado manualmente no Zen",
+                color=(150, 150, 150)
+            )
+
+            dpg.add_spacer(height=10)
+            dpg.add_separator()
+            dpg.add_spacer(height=10)
+
+            dpg.add_text("Apps por Workspace:")
+            dpg.add_spacer(height=5)
+
+            # Apps options (importado de constants.py)
+            apps_options = AVAILABLE_APPS
+
+            # Workspace 1
+            dpg.add_combo(
+                label="Workspace 1",
+                tag="wizard_ws1",
+                items=apps_options,
+                default_value=project.get('workspace_1_app', "") if project else "",
+                width=350
+            )
+            with dpg.group(horizontal=True):
+                dpg.add_input_text(
+                    label="Atalho WS1",
+                    tag="wizard_ws1_hotkey",
+                    hint="Ex: ctrl+shift+e",
+                    default_value=project.get('workspace_1_hotkey', "") if project else "",
+                    width=220
+                )
+                capture_btn = dpg.add_button(
+                    label="Capturar",
+                    callback=lambda: self.open_capture_hotkey_modal("wizard_ws1_hotkey"),
+                    width=110
+                )
+                dpg.bind_item_theme(capture_btn, self.blue_button_theme)
+            dpg.add_spacer(height=5)
+
+            # Workspace 2
+            dpg.add_combo(
+                label="Workspace 2",
+                tag="wizard_ws2",
+                items=apps_options,
+                default_value=project.get('workspace_2_app', "") if project else "",
+                width=350
+            )
+            with dpg.group(horizontal=True):
+                dpg.add_input_text(
+                    label="Atalho WS2",
+                    tag="wizard_ws2_hotkey",
+                    hint="Ex: ctrl+alt+minus",
+                    default_value=project.get('workspace_2_hotkey', "") if project else "",
+                    width=220
+                )
+                capture_btn = dpg.add_button(
+                    label="Capturar",
+                    callback=lambda: self.open_capture_hotkey_modal("wizard_ws2_hotkey"),
+                    width=110
+                )
+                dpg.bind_item_theme(capture_btn, self.blue_button_theme)
+            dpg.add_spacer(height=5)
+
+            # Workspace 3
+            dpg.add_combo(
+                label="Workspace 3",
+                tag="wizard_ws3",
+                items=apps_options,
+                default_value=project.get('workspace_3_app', "") if project else "",
+                width=350
+            )
+            with dpg.group(horizontal=True):
+                dpg.add_input_text(
+                    label="Atalho WS3",
+                    tag="wizard_ws3_hotkey",
+                    hint="Ex: ctrl+shift+e",
+                    default_value=project.get('workspace_3_hotkey', "") if project else "",
+                    width=220
+                )
+                capture_btn = dpg.add_button(
+                    label="Capturar",
+                    callback=lambda: self.open_capture_hotkey_modal("wizard_ws3_hotkey"),
+                    width=110
+                )
+                dpg.bind_item_theme(capture_btn, self.blue_button_theme)
+
+
+            dpg.add_spacer(height=10)
+            dpg.add_separator()
+            dpg.add_spacer(height=10)
+
+            # URLs
+            urls_str = ""
+            if project and project.get('urls'):
+                urls_str = ", ".join(project['urls'])
+
+            dpg.add_input_text(
+                label="URLs (separadas por virgula)",
+                tag="wizard_urls",
+                default_value=urls_str,
+                width=350,
+                multiline=True,
+                height=60
+            )
+
+            dpg.add_spacer(height=15)
+
+            # Mensagem de erro
+            dpg.add_text("", tag="wizard_error", color=(255, 50, 50), show=False)
+
+            dpg.add_spacer(height=10)
+
+            # Botoes de acao
+            with dpg.group(horizontal=True):
+                save_btn = dpg.add_button(
+                    label="Salvar",
+                    callback=lambda: self.save_project_wizard(project_id),
+                    width=200
+                )
+                dpg.bind_item_theme(save_btn, self.green_button_theme)
+
+                dpg.add_spacer(width=20)
+
+                cancel_btn = dpg.add_button(
+                    label="Cancelar",
+                    callback=lambda: dpg.delete_item("project_wizard_modal"),
+                    width=200
+                )
+                dpg.bind_item_theme(cancel_btn, self.red_button_theme)
+
+    def create_interface(self):
+        """Cria a interface principal"""
+        with dpg.window(
+            label="Arquiteto",
+            tag="main_window",
+            width=self.window_width,
+            height=self.window_height,
+            pos=(50, 50),
+            no_close=True,
+            no_collapse=True,
+        ):
+            # Header com titulo e botao sair
+            with dpg.group(horizontal=True):
+                dpg.add_text("ARQUITETO", color=(100, 200, 255))
+                dpg.add_spacer(width=20)
+                dpg.add_text("Gerenciador de Projetos", color=(150, 150, 150))
+
+                # Spacer para empurrar botao para direita
+                dpg.add_spacer(width=300)
+
+                exit_btn = dpg.add_button(
+                    label="Sair",
+                    callback=lambda: dpg.stop_dearpygui(),
+                    width=80
+                )
+                dpg.bind_item_theme(exit_btn, self.red_button_theme)
+
+            dpg.add_separator()
+            dpg.add_spacer(height=15)
+
+            # Dashboard - 3 secoes em tabela flex
+            with dpg.table(
+                header_row=False,
+                borders_innerH=False,
+                borders_innerV=True,
+                borders_outerH=False,
+                borders_outerV=False,
+                policy=dpg.mvTable_SizingStretchProp
+            ):
+                # 3 colunas com largura igual (flex)
+                dpg.add_table_column(width_stretch=True, init_width_or_weight=1.0)
+                dpg.add_table_column(width_stretch=True, init_width_or_weight=1.0)
+                dpg.add_table_column(width_stretch=True, init_width_or_weight=1.0)
+
+                with dpg.table_row():
+                    # Coluna 1: Workspace
+                    with dpg.table_cell():
+                        dpg.add_spacer(height=10)
+                        dpg.add_text("WORKSPACE", color=(100, 100, 100))
+                        dpg.add_spacer(height=3)
+                        dpg.add_text(
+                            "Carregando...",
+                            tag="workspace_value",
+                            color=(100, 255, 255)
+                        )
+                        dpg.add_spacer(height=10)
+
+                    # Coluna 2: Projeto Ativo
+                    with dpg.table_cell():
+                        dpg.add_spacer(height=10)
+                        dpg.add_text("PROJETO ATIVO", color=(100, 100, 100))
+                        dpg.add_spacer(height=3)
+                        dpg.add_text(
+                            "Nenhum",
+                            tag="active_project_value",
+                            color=(150, 150, 150)
+                        )
+                        dpg.add_spacer(height=10)
+
+                    # Coluna 3: RAM
+                    with dpg.table_cell():
+                        dpg.add_spacer(height=10)
+                        dpg.add_text("MEMORIA RAM", color=(100, 100, 100))
+                        dpg.add_spacer(height=3)
+                        dpg.add_text(
+                            "Carregando...",
+                            tag="ram_value",
+                            color=(100, 255, 100)
+                        )
+                        dpg.add_spacer(height=10)
+
+            dpg.add_separator()
+            dpg.add_spacer(height=15)
+
+            # Botoes de acao
+            with dpg.group(horizontal=True):
+                new_btn = dpg.add_button(
+                    label="+ Novo Projeto",
+                    callback=self.new_project_callback,
+                    width=180,
+                    height=40
+                )
+                dpg.bind_item_theme(new_btn, self.green_button_theme)
+
+                dpg.add_spacer(width=20)
+
+                emergency_btn = dpg.add_button(
+                    label="EMERGENCIA: Fechar Tudo",
+                    callback=self.emergency_callback,
+                    width=250,
+                    height=40
+                )
+                dpg.bind_item_theme(emergency_btn, self.red_button_theme)
+
+            dpg.add_spacer(height=20)
+            dpg.add_text("Projetos", color=(150, 150, 150))
+            dpg.add_separator()
+            dpg.add_spacer(height=10)
+
+            # Grid de projetos
+            with dpg.child_window(tag="projects_grid", border=False):
+                dpg.add_text("Carregando projetos...")
+
+    def run(self):
+        """Inicializa e roda a aplicacao"""
+        # Detectar monitores
+        self.detect_monitors()
+
+        # Setup Dear PyGui
+        dpg.create_context()
+
+        # Configurar viewport
+        dpg.create_viewport(
+            title="Arquiteto",
+            width=self.window_width,
+            height=self.window_height,
+            resizable=True,
+            min_width=1000,
+            min_height=700,
+        )
+
+        # Aplicar tema
+        self.setup_theme()
+
+        # Criar interface
+        self.create_interface()
+
+        # Setup e show
+        dpg.setup_dearpygui()
+        dpg.show_viewport()
+        dpg.set_primary_window("main_window", True)
+
+        # Mover para workspace 9
+        self.move_to_workspace_9()
+
+        # Handler de resize
+        with dpg.item_handler_registry(tag="resize_handler"):
+            dpg.add_item_resize_handler(callback=lambda: self.on_resize())
+
+        dpg.bind_item_handler_registry("main_window", "resize_handler")
+
+        # Chamar resize inicial
+        self.on_resize()
+
+        # Carregar projetos
+        self.refresh_project_list()
+
+        # Loop principal com atualizacao
+        while dpg.is_dearpygui_running():
+            self.update_window_info()
+            self.capture_hotkey_handler()  # Capturar atalhos de teclado
+            dpg.render_dearpygui_frame()
+
+        # Cleanup
+        dpg.destroy_context()
+
+
+if __name__ == "__main__":
+    app = Arquiteto()
+    app.run()

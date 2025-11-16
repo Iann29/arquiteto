@@ -1,0 +1,4 @@
+dearpygui
+screeninfo
+psutil
+selenium
