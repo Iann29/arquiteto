@@ -72,15 +72,35 @@ class Arquiteto:
         import random
         node_id = f"node_abrir_{random.randint(1000, 9999)}"
 
+        # Criar tema customizado para node "Abrir" (verde)
+        if not dpg.does_item_exist("theme_abrir"):
+            with dpg.theme(tag="theme_abrir"):
+                with dpg.theme_component(dpg.mvNode):
+                    # Fundo do node (verde claro)
+                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackground, (100, 200, 100, 255), category=dpg.mvThemeCat_Nodes)
+                    # Fundo quando hover (verde mais claro)
+                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackgroundHovered, (120, 220, 120, 255), category=dpg.mvThemeCat_Nodes)
+                    # Fundo quando selecionado (verde brilhante)
+                    dpg.add_theme_color(dpg.mvNodeCol_NodeBackgroundSelected, (150, 255, 150, 255), category=dpg.mvThemeCat_Nodes)
+                    # Barra de título (verde escuro)
+                    dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (50, 150, 50, 255), category=dpg.mvThemeCat_Nodes)
+                    # Barra de título hover
+                    dpg.add_theme_color(dpg.mvNodeCol_TitleBarHovered, (70, 170, 70, 255), category=dpg.mvThemeCat_Nodes)
+                    # Barra de título selecionado
+                    dpg.add_theme_color(dpg.mvNodeCol_TitleBarSelected, (90, 190, 90, 255), category=dpg.mvThemeCat_Nodes)
+
         # Criar node no editor
-        with dpg.node(label="Abrir", tag=node_id, parent="map_node_editor", pos=(400, 100)):
+        with dpg.node(label="  Abrir  ", tag=node_id, parent="map_node_editor", pos=(400, 100)):
             # Input - recebe contexto (projeto, path, etc)
             with dpg.node_attribute(label="Input", attribute_type=dpg.mvNode_Attr_Input):
-                dpg.add_text("<- Recebe")
+                dpg.add_spacer(width=80, height=5)  # Spacer invisível pra dar tamanho
 
             # Output - passa contexto pra frente (sinaliza "vai abrir")
             with dpg.node_attribute(label="Output", attribute_type=dpg.mvNode_Attr_Output):
-                dpg.add_text("Abrir ->")
+                dpg.add_spacer(width=80, height=5)  # Spacer invisível pra dar tamanho
+
+        # Aplicar tema ao node
+        dpg.bind_item_theme(node_id, "theme_abrir")
 
         print(f"Node 'Abrir' adicionado: {node_id}")
 
