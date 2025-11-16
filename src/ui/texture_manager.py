@@ -32,6 +32,7 @@ class TextureManager:
         # Carregar texturas de nodes
         cls._load_texture(nodes_path / "projeto_iniciado.png", "tex_projeto_iniciado")
         cls._load_texture(nodes_path / "abrir.png", "tex_abrir")
+        cls._load_texture(nodes_path / "nodes_disponiveis.png", "tex_workspace")
 
         # Carregar texturas de apps
         cls._load_texture(apps_path / "zed-logo.png", "tex_zed")

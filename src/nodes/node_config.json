@@ -28,10 +28,24 @@
     "card_category": "nodes",
     "output_contains_image": true
   },
+  "workspace": {
+    "label": "Workspace",
+    "type": "workspace",
+    "theme": null,
+    "texture": "tex_workspace",
+    "image_size": [60, 60],
+    "has_input": true,
+    "has_output": true,
+    "has_content": true,
+    "default_pos": [100, 250],
+    "card_color": [255, 165, 0],
+    "card_size": 100,
+    "card_category": "nodes"
+  },
   "zed": {
     "label": "  Zed  ",
     "type": "zed",
-    "theme": "zed",
+    "theme": null,
     "texture": "tex_zed",
     "image_size": [60, 60],
     "has_input": true,

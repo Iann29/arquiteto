@@ -53,7 +53,12 @@ class BaseNode:
 
     def _create_input_attribute(self):
         """Cria atributo de entrada (pin de conexão)"""
-        with dpg.node_attribute(label="Input", attribute_type=dpg.mvNode_Attr_Input):
+        input_tag = f"{self.node_id}_input"
+        with dpg.node_attribute(
+            label="Input",
+            attribute_type=dpg.mvNode_Attr_Input,
+            tag=input_tag,
+        ):
             dpg.add_spacer(width=1, height=1)
 
     def _create_content_attribute(self):
@@ -63,15 +68,21 @@ class BaseNode:
 
     def _create_output_attribute(self):
         """Cria atributo de saída (pin de conexão)"""
+        output_tag = f"{self.node_id}_output"
+
         # Caso especial: Node "Abrir" tem imagem NO output
         if self.config.get("output_contains_image", False):
             with dpg.node_attribute(
-                label="Output", attribute_type=dpg.mvNode_Attr_Output
+                label="Output",
+                attribute_type=dpg.mvNode_Attr_Output,
+                tag=output_tag,
             ):
                 self._render_content()
         else:
             with dpg.node_attribute(
-                label="Output", attribute_type=dpg.mvNode_Attr_Output
+                label="Output",
+                attribute_type=dpg.mvNode_Attr_Output,
+                tag=output_tag,
             ):
                 dpg.add_spacer(width=1, height=1)
 
@@ -83,8 +94,8 @@ class BaseNode:
             # Renderizar imagem
             w, h = self.config.get("image_size", (60, 60))
 
-            # Se tem spacing horizontal (como Zed/Claude)
-            if self.config["type"] in ["zed", "claude"]:
+            # Programas têm spacing horizontal para centralizar
+            if self.config.get("card_category") == "programs":
                 with dpg.group(horizontal=True):
                     dpg.add_spacer(width=10)
                     dpg.add_image(texture_tag, width=w, height=h)

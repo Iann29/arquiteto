@@ -7,20 +7,21 @@ import uuid
 from typing import Optional
 from .base_node import BaseNode
 from .node_registry import NodeRegistry
-from .node_types import ProjetoIniciadoNode
+from .node_types import ProjetoIniciadoNode, WorkspaceNode
 
 
 class NodeFactory:
     """Factory para criar nodes de forma simplificada"""
 
     @staticmethod
-    def create_node(node_type: str, pos: Optional[tuple] = None):
+    def create_node(node_type: str, pos: Optional[tuple] = None, node_id: Optional[str] = None):
         """
         Cria um node a partir do tipo
 
         Args:
             node_type: Tipo do node (ex: "zed", "abrir", "projeto_iniciado")
             pos: Posição (x, y) no editor. Se None, usa default do config
+            node_id: ID personalizado para o node (opcional). Se None, gera automaticamente.
 
         Returns:
             Instância de BaseNode ou subclasse específica
@@ -35,8 +36,9 @@ class NodeFactory:
         # Pegar configuração
         config = NodeRegistry.get_config(node_type)
 
-        # Gerar ID único
-        node_id = f"node_{node_type}_{uuid.uuid4().hex[:8]}"
+        # Gerar ID único (ou usar customizado)
+        if node_id is None:
+            node_id = f"node_{node_type}_{uuid.uuid4().hex[:8]}"
 
         # Usar posição padrão se não fornecida
         if pos is None:
@@ -45,6 +47,8 @@ class NodeFactory:
         # Criar node específico se tiver classe customizada
         if node_type == "projeto_iniciado":
             return ProjetoIniciadoNode(node_id, config, pos)
+        elif node_type == "workspace":
+            return WorkspaceNode(node_id, config, pos)
 
         # Caso padrão: BaseNode
         return BaseNode(node_id, config, pos)
